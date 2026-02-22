@@ -37,6 +37,8 @@ dependencies:
   sqflite_common_ffi: ^2.4.0+2
   path: ^1.9.1
   path_provider: ^2.1.5
+  tray_manager: ^0.5.2
+  local_notifier: ^0.1.6
   window_manager:
     git:
       url: https://github.com/boyan01/window_manager.git
@@ -64,6 +66,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/tray_icon.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 import 'database_helper.dart';
+import 'main.dart' show MainWindowRefreshNotifier, openNewUserDialog;
 import 'user_form_dialog.dart';
 
 class MainWindow extends StatefulWidget {
@@ -11,7 +13,8 @@ class MainWindow extends StatefulWidget {
   State<MainWindow> createState() => _MainWindowState();
 }
 
-class _MainWindowState extends State<MainWindow> with WindowListener {
+class _MainWindowState extends State<MainWindow>
+    with WindowListener, TrayListener {
   List<Map<String, dynamic>> _users = [];
   String _statusMessage = 'Ready';
 
@@ -19,13 +22,25 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
   void initState() {
     super.initState();
     windowManager.addListener(this);
+    trayManager.addListener(this);
+    // Allow tray "Refresh" action to trigger data reload.
+    MainWindowRefreshNotifier.instance.addListener(_refreshUsers);
     _refreshUsers();
   }
 
   @override
   void dispose() {
     windowManager.removeListener(this);
+    trayManager.removeListener(this);
+    MainWindowRefreshNotifier.instance.removeListener(_refreshUsers);
     super.dispose();
+  }
+
+  /// Double-click the tray icon → show and focus the main window.
+  @override
+  void onTrayIconMouseDown() async {
+    await windowManager.show();
+    await windowManager.focus();
   }
 
   /// Intercepts the OS X button — shows a confirmation dialog first.

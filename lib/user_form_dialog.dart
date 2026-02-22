@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:local_notifier/local_notifier.dart';
 import 'database_helper.dart';
 
 /// A dialog widget for adding or editing a user.
@@ -51,6 +52,12 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
     if (widget.initialData == null) {
       await DatabaseHelper.instance.insertUser(user);
+      // Trigger a native OS notification for new inserts only.
+      final notification = LocalNotification(
+        title: 'User Manager',
+        body: 'New user "${user['name']}" was added successfully.',
+      );
+      await notification.show();
     } else {
       await DatabaseHelper.instance.updateUser(user, widget.initialData!['id']);
     }
