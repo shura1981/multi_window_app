@@ -42,8 +42,20 @@ class _MainWindowState extends State<MainWindow>
   /// Double-click the tray icon → show and focus the main window.
   @override
   void onTrayIconMouseDown() async {
-    await windowManager.show();
-    await windowManager.focus();
+    if (!await windowManager.isFocused()) {
+      if (await windowManager.isMinimized()) {
+        await windowManager.restore();
+      }
+      if (Platform.isLinux) {
+        // Unmap and remap to force Wayland to bring the window to front without focus-stealing prevention
+        await windowManager.hide();
+      }
+      await windowManager.show();
+      await windowManager.setAlwaysOnTop(true);
+      await windowManager.focus();
+      await Future.delayed(const Duration(milliseconds: 300));
+      await windowManager.setAlwaysOnTop(false);
+    }
   }
 
   /// Intercepts the OS X button — shows a confirmation dialog first.

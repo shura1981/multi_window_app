@@ -39,13 +39,36 @@ Future<void> main(List<String> args) async {
   await trayManager.setContextMenu(Menu(
     items: [
       MenuItem(label: 'Show Window', onClick: (_) async {
-        await windowManager.show();
-        await windowManager.focus();
+        if (!await windowManager.isFocused()) {
+          if (await windowManager.isMinimized()) {
+            await windowManager.restore();
+          }
+          if (Platform.isLinux) {
+            // Unmap and remap to bypass Wayland focus stealing prevention completely
+            await windowManager.hide();
+          }
+          await windowManager.show();
+          await windowManager.setAlwaysOnTop(true);
+          await windowManager.focus();
+          await Future.delayed(const Duration(milliseconds: 300));
+          await windowManager.setAlwaysOnTop(false);
+        }
       }),
       MenuItem.separator(),
       MenuItem(label: 'New User', onClick: (_) async {
-        await windowManager.show();
-        await windowManager.focus();
+        if (!await windowManager.isFocused()) {
+          if (await windowManager.isMinimized()) {
+            await windowManager.restore();
+          }
+          if (Platform.isLinux) {
+            await windowManager.hide();
+          }
+          await windowManager.show();
+          await windowManager.setAlwaysOnTop(true);
+          await windowManager.focus();
+          await Future.delayed(const Duration(milliseconds: 300));
+          await windowManager.setAlwaysOnTop(false);
+        }
         // Small delay so the window is in foreground before the dialog.
         await Future.delayed(const Duration(milliseconds: 200));
         openNewUserDialog();
