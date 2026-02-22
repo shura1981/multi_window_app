@@ -81,6 +81,43 @@ class _EmailDetailViewState extends State<EmailDetailView> {
       bodyText = bodyText.replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ').trim();
     }
 
+    // Extract image parts
+    List<Widget> bodyWidgets = [];
+    
+    bodyWidgets.add(
+      SelectableText(
+        bodyText,
+        style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+      ),
+    );
+
+    if (message.parts != null) {
+      for (final part in message.parts!) {
+        final contentType = part.mediaType;
+        if (contentType.isImage) {
+          final imageData = part.decodeContentBinary();
+          if (imageData != null) {
+            bodyWidgets.add(const SizedBox(height: 16));
+            bodyWidgets.add(
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(
+                    imageData,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            );
+          }
+        }
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -140,9 +177,9 @@ class _EmailDetailViewState extends State<EmailDetailView> {
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
-            child: SelectableText(
-              bodyText,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: bodyWidgets,
             ),
           ),
         ),
