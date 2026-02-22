@@ -1,8 +1,8 @@
 [Desktop Entry]
 Version=1.0.0
-Name=multi window app
-GenericName=multi window app
-Comment=A new Flutter project.
+Name=User Manager
+GenericName=User Manager
+Comment=User Manager with Multi-Window and Print support.
 Terminal=false
 Type=Application
 Categories=Utility;

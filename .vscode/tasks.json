@@ -1,0 +1,33 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "1. Construir Proyecto Linux (Portable)",
+            "type": "shell",
+            "command": "flutter build linux --release",
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "2. Generar Instalador (.deb)",
+            "type": "shell",
+            "command": "./build_deb.sh",
+            "group": "build",
+            // Depende de que primero exista el build compilado
+            "dependsOn": [
+                "1. Construir Proyecto Linux (Portable)"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}
