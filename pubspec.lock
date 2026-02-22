@@ -432,6 +432,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.0"
+  system_resources:
+    dependency: "direct main"
+    description:
+      name: system_resources
+      sha256: "7e78cf8ef224c1e0b6bf4462322b6739fea2274fef928cbcbf21ae5e5a8272d8"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.0"
   term_glyph:
     dependency: transitive
     description:

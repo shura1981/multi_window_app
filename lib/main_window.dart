@@ -5,6 +5,7 @@ import 'package:window_manager/window_manager.dart';
 import 'database_helper.dart';
 import 'main.dart' show MainWindowRefreshNotifier, openNewUserDialog;
 import 'user_form_dialog.dart';
+import 'system_monitor_dialog.dart';
 
 class MainWindow extends StatefulWidget {
   const MainWindow({super.key});
@@ -115,6 +116,13 @@ class _MainWindowState extends State<MainWindow>
     }
   }
 
+  void _showSystemMonitor() {
+    showDialog(
+      context: context,
+      builder: (_) => const SystemMonitorDialog(),
+    );
+  }
+
   void _showAbout() {
     showAboutDialog(
       context: context,
@@ -140,6 +148,12 @@ class _MainWindowState extends State<MainWindow>
                     leadingIcon: const Icon(Icons.add, size: 16),
                     onPressed: () => _openUserDialog(),
                     child: const MenuAcceleratorLabel('&New User\tCtrl+N'),
+                  ),
+                  const Divider(),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.monitor, size: 16),
+                    onPressed: _showSystemMonitor,
+                    child: const MenuAcceleratorLabel('&System Monitor (htop)\tCtrl+M'),
                   ),
                   const Divider(),
                   MenuItemButton(
