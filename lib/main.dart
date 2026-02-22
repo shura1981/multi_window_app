@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_notifier/local_notifier.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'main_window.dart';
 import 'theme_provider.dart';
 import 'user_form_dialog.dart';
@@ -26,6 +27,11 @@ void openNewUserDialog() {
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // ── desktop_webview_window ─────────────────────────────────────────────
+  if (runWebViewTitleBarWidget(args)) {
+    return;
+  }
 
   // ── window_manager ────────────────────────────────────────────────────
   await windowManager.ensureInitialized();

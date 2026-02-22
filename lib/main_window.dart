@@ -11,6 +11,7 @@ import 'print_dialog.dart';
 import 'theme_settings_dialog.dart';
 import 'email_service.dart';
 import 'email_view.dart';
+import 'browser_dialog.dart';
 
 enum ViewState { users, emails }
 
@@ -143,6 +144,13 @@ class _MainWindowState extends State<MainWindow>
     }
   }
 
+  void _showBrowserDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => const BrowserLauncherDialog(),
+    );
+  }
+
   void _showSystemMonitor() {
     showDialog(
       context: context,
@@ -188,9 +196,16 @@ class _MainWindowState extends State<MainWindow>
         },
         child: Focus(
           autofocus: true,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Webview native extensions occasionally cause the root window to report a microscopic 
+              // constraint (e.g. 1x1) during its platform attach/detach lifecycle on Linux.
+              if (constraints.maxHeight < 100 || constraints.maxWidth < 100) {
+                return const SizedBox.shrink();
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
           // ── Menu Bar ─────────────────────────────────────────────────
           MenuBar(
             children: [
@@ -249,6 +264,12 @@ class _MainWindowState extends State<MainWindow>
                     },
                     shortcut: const SingleActivator(LogicalKeyboardKey.digit2, control: true),
                     child: const MenuAcceleratorLabel('Ver &Correo\tCtrl+2'),
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.travel_explore, size: 16),
+                    onPressed: () => _showBrowserDialog(),
+                    shortcut: const SingleActivator(LogicalKeyboardKey.digit3, control: true),
+                    child: const Text('Navegador Web'),
                   ),
                 ],
                 child: const MenuAcceleratorLabel('&Modo'),
@@ -375,8 +396,10 @@ class _MainWindowState extends State<MainWindow>
             ),
           ),
         ],
-      ),
-      ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }

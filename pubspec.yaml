@@ -53,6 +53,8 @@ dependencies:
   desktop_multi_window: ^0.3.0
   flutter_html: ^3.0.0
   flutter_widget_from_html: ^0.17.1
+  webview_flutter: ^4.13.1
+  desktop_webview_window: ^0.2.3
 
 dev_dependencies:
   flutter_test:

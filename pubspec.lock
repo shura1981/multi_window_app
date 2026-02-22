@@ -233,6 +233,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.0"
+  desktop_webview_window:
+    dependency: "direct main"
+    description:
+      name: desktop_webview_window
+      sha256: "57cf20d81689d5cbb1adfd0017e96b669398a669d927906073b0e42fc64111c0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.3"
   encrypter_plus:
     dependency: transitive
     description:
@@ -1398,7 +1406,7 @@ packages:
     source: hosted
     version: "1.2.1"
   webview_flutter:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: webview_flutter
       sha256: a3da219916aba44947d3a5478b1927876a09781174b5a2b67fa5be0555154bf9
