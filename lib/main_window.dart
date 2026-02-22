@@ -6,6 +6,7 @@ import 'database_helper.dart';
 import 'main.dart' show MainWindowRefreshNotifier, openNewUserDialog;
 import 'user_form_dialog.dart';
 import 'system_monitor_dialog.dart';
+import 'print_dialog.dart';
 
 class MainWindow extends StatefulWidget {
   const MainWindow({super.key});
@@ -123,6 +124,13 @@ class _MainWindowState extends State<MainWindow>
     );
   }
 
+  void _showPrintDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => PrintDialog(usersToPrint: _users),
+    );
+  }
+
   void _showAbout() {
     showAboutDialog(
       context: context,
@@ -154,6 +162,12 @@ class _MainWindowState extends State<MainWindow>
                     leadingIcon: const Icon(Icons.monitor, size: 16),
                     onPressed: _showSystemMonitor,
                     child: const MenuAcceleratorLabel('&System Monitor (htop)\tCtrl+M'),
+                  ),
+                  const Divider(),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.print, size: 16),
+                    onPressed: _showPrintDialog,
+                    child: const MenuAcceleratorLabel('&Print Table\tCtrl+P'),
                   ),
                   const Divider(),
                   MenuItemButton(

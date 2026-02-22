@@ -45,6 +45,8 @@ dependencies:
       path: packages/window_manager
       ref: 6fae92d21b4c80ce1b8f71c1190d7970cf722bd4
   system_resources: ^1.6.0
+  printing: ^5.14.2
+  pdf: ^3.11.3
 
 dev_dependencies:
   flutter_test:
