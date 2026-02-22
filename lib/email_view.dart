@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:enough_mail/enough_mail.dart';
 import 'email_model.dart';
 import 'email_service.dart';
+import 'email_detail_view.dart';
 
 class EmailView extends StatefulWidget {
   final EmailService emailService;
@@ -14,6 +14,7 @@ class EmailView extends StatefulWidget {
 
 class _EmailViewState extends State<EmailView> {
   late Future<List<EmailModel>> _emailsFuture;
+  EmailModel? _selectedEmail;
 
   @override
   void initState() {
@@ -23,48 +24,26 @@ class _EmailViewState extends State<EmailView> {
 
   void _loadEmails() {
     setState(() {
+      _selectedEmail = null;
       _emailsFuture = widget.emailService.getUnreadEmails();
     });
   }
 
-  void _handleRowTap(EmailModel email) async {
-    if (email.hasAttachments) {
-      try {
-        final paths = await widget.emailService.downloadAttachments(email.originalMessage);
-        if (paths.isNotEmpty) {
-           print('=================================');
-           print('Attachments downloaded for "${email.subject}":');
-           for (var path in paths) {
-             print(' -> $path');
-           }
-           print('=================================');
-           
-           if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-               SnackBar(content: Text('Descargados ${paths.length} adjuntos en SavedAttachments')),
-             );
-           }
-        } else {
-           if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-               const SnackBar(content: Text('No se encontraron PDFs ni Imágenes válidas')),
-             );
-           }
-        }
-      } catch (e) {
-         if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-               SnackBar(content: Text('Error al descargar: $e'), backgroundColor: Colors.red),
-             );
-         }
-      }
-    } else {
-      print('El correo "${email.subject}" no tiene archivos adjuntos.');
-    }
+  void _handleRowTap(EmailModel email) {
+    setState(() {
+      _selectedEmail = email;
+    });
   }
-
   @override
   Widget build(BuildContext context) {
+    if (_selectedEmail != null) {
+      return EmailDetailView(
+        email: _selectedEmail!,
+        emailService: widget.emailService,
+        onBack: () => setState(() => _selectedEmail = null),
+      );
+    }
+
     final theme = Theme.of(context);
 
     return Column(
