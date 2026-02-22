@@ -215,27 +215,6 @@ class _MainWindowState extends State<MainWindow>
             ],
           ),
 
-          // ── Toolbar ───────────────────────────────────────────────────
-          Container(
-            color: theme.colorScheme.surfaceContainerLow,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              children: [
-                FilledButton.icon(
-                  onPressed: () => _openUserDialog(),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('New User'),
-                ),
-                const SizedBox(width: 8),
-                IconButton.outlined(
-                  icon: const Icon(Icons.refresh, size: 18),
-                  tooltip: 'Refresh',
-                  onPressed: _refreshUsers,
-                ),
-              ],
-            ),
-          ),
-
           // ── Data Table — full width ───────────────────────────────────
           Expanded(
             child: _users.isEmpty
