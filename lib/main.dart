@@ -29,7 +29,11 @@ Future<void> main(List<String> args) async {
 
     runApp(SubWindowApp(user: user, mainWindowId: mainWindowId));
   } else {
-    // ── Main window — do NOT use windowManager (causes GTK MenuBar crash) ──
+    // ── Main window ────────────────────────────────────────────────────
+    // Initialize window_manager WITHOUT waitUntilReadyToShow to avoid
+    // conflicting with the GTK MenuBar focus management.
+    await windowManager.ensureInitialized();
+    await windowManager.setPreventClose(true);
     runApp(const MainApp());
   }
 }
@@ -41,6 +45,7 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      navigatorKey: mainNavigatorKey,
       title: 'User Manager',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

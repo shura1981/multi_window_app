@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
+import 'package:window_manager/window_manager.dart';
 import 'database_helper.dart';
 
 class MainWindow extends StatefulWidget {
@@ -12,30 +12,52 @@ class MainWindow extends StatefulWidget {
   State<MainWindow> createState() => _MainWindowState();
 }
 
-class _MainWindowState extends State<MainWindow> {
+/// Global navigator key so we can show dialogs from outside the widget tree.
+final mainNavigatorKey = GlobalKey<NavigatorState>();
+
+class _MainWindowState extends State<MainWindow> with WindowListener {
   List<Map<String, dynamic>> _users = [];
   String? _mainWindowId;
   String _statusMessage = 'Ready';
-  late AppLifecycleListener _lifecycleListener;
 
   @override
   void dispose() {
-    _lifecycleListener.dispose();
+    windowManager.removeListener(this);
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
-    // Force-kill process when main window is closed so hidden sub-window
-    // Flutter engines don't keep the OS process alive.
-    _lifecycleListener = AppLifecycleListener(
-      onExitRequested: () async {
-        exit(0); // Kills process including all hidden sub-window engines.
-      },
-    );
+    windowManager.addListener(this);
     _refreshUsers();
     _setupWindowHandler();
+  }
+
+  /// Called by window_manager when the user presses the OS X button.
+  @override
+  void onWindowClose() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Exit Application'),
+        content: const Text('Are you sure you want to close User Manager?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Exit'),
+          ),
+        ],
+      ),
+    );
+    if (shouldExit == true) {
+      await windowManager.close();
+      exit(0);
+    }
   }
 
   Future<void> _setupWindowHandler() async {
