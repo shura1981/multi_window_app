@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'database_helper.dart';
 
@@ -14,10 +16,24 @@ class _MainWindowState extends State<MainWindow> {
   List<Map<String, dynamic>> _users = [];
   String? _mainWindowId;
   String _statusMessage = 'Ready';
+  late AppLifecycleListener _lifecycleListener;
+
+  @override
+  void dispose() {
+    _lifecycleListener.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    // Force-kill process when main window is closed so hidden sub-window
+    // Flutter engines don't keep the OS process alive.
+    _lifecycleListener = AppLifecycleListener(
+      onExitRequested: () async {
+        exit(0); // Kills process including all hidden sub-window engines.
+      },
+    );
     _refreshUsers();
     _setupWindowHandler();
   }
