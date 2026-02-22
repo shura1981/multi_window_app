@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 import 'database_helper.dart';
@@ -164,8 +165,19 @@ class _MainWindowState extends State<MainWindow>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.keyN, control: true): () => _openUserDialog(),
+          const SingleActivator(LogicalKeyboardKey.keyM, control: true): _showSystemMonitor,
+          const SingleActivator(LogicalKeyboardKey.keyP, control: true): _showPrintDialog,
+          const SingleActivator(LogicalKeyboardKey.keyR, control: true): _refreshUsers,
+          const SingleActivator(LogicalKeyboardKey.keyT, control: true): _showThemeSettings,
+          const SingleActivator(LogicalKeyboardKey.f1): _showAbout,
+        },
+        child: Focus(
+          autofocus: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // ── Menu Bar ─────────────────────────────────────────────────
           MenuBar(
@@ -175,25 +187,29 @@ class _MainWindowState extends State<MainWindow>
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.add, size: 16),
                     onPressed: () => _openUserDialog(),
+                    shortcut: const SingleActivator(LogicalKeyboardKey.keyN, control: true),
                     child: const MenuAcceleratorLabel('&New User\tCtrl+N'),
                   ),
                   const Divider(),
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.monitor, size: 16),
                     onPressed: _showSystemMonitor,
+                    shortcut: const SingleActivator(LogicalKeyboardKey.keyM, control: true),
                     child: const MenuAcceleratorLabel('&System Monitor (htop)\tCtrl+M'),
                   ),
                   const Divider(),
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.print, size: 16),
                     onPressed: _showPrintDialog,
+                    shortcut: const SingleActivator(LogicalKeyboardKey.keyP, control: true),
                     child: const MenuAcceleratorLabel('&Print Table\tCtrl+P'),
                   ),
                   const Divider(),
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.refresh, size: 16),
                     onPressed: _refreshUsers,
-                    child: const MenuAcceleratorLabel('&Refresh'),
+                    shortcut: const SingleActivator(LogicalKeyboardKey.keyR, control: true),
+                    child: const MenuAcceleratorLabel('&Refresh\tCtrl+R'),
                   ),
                   const Divider(),
                   MenuItemButton(
@@ -209,7 +225,8 @@ class _MainWindowState extends State<MainWindow>
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.palette, size: 16),
                     onPressed: _showThemeSettings,
-                    child: const MenuAcceleratorLabel('&Theme Settings'),
+                    shortcut: const SingleActivator(LogicalKeyboardKey.keyT, control: true),
+                    child: const MenuAcceleratorLabel('&Theme Settings\tCtrl+T'),
                   ),
                 ],
                 child: const MenuAcceleratorLabel('&View'),
@@ -219,7 +236,8 @@ class _MainWindowState extends State<MainWindow>
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.info_outline, size: 16),
                     onPressed: _showAbout,
-                    child: const MenuAcceleratorLabel('&About'),
+                    shortcut: const SingleActivator(LogicalKeyboardKey.f1),
+                    child: const MenuAcceleratorLabel('&About\tF1'),
                   ),
                 ],
                 child: const MenuAcceleratorLabel('&Help'),
@@ -322,6 +340,8 @@ class _MainWindowState extends State<MainWindow>
             ),
           ),
         ],
+      ),
+      ),
       ),
     );
   }
