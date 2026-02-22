@@ -1,9 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:window_manager/window_manager.dart';
 import 'database_helper.dart';
+import 'user_form_dialog.dart';
 
 class MainWindow extends StatefulWidget {
   const MainWindow({super.key});
@@ -12,13 +11,16 @@ class MainWindow extends StatefulWidget {
   State<MainWindow> createState() => _MainWindowState();
 }
 
-/// Global navigator key so we can show dialogs from outside the widget tree.
-final mainNavigatorKey = GlobalKey<NavigatorState>();
-
 class _MainWindowState extends State<MainWindow> with WindowListener {
   List<Map<String, dynamic>> _users = [];
-  String? _mainWindowId;
   String _statusMessage = 'Ready';
+
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+    _refreshUsers();
+  }
 
   @override
   void dispose() {
@@ -26,29 +28,21 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
     super.dispose();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    windowManager.addListener(this);
-    _refreshUsers();
-    _setupWindowHandler();
-  }
-
-  /// Called by window_manager when the user presses the OS X button.
+  /// Intercepts the OS X button — shows a confirmation dialog first.
   @override
   void onWindowClose() async {
     final shouldExit = await showDialog<bool>(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Exit Application'),
         content: const Text('Are you sure you want to close User Manager?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Exit'),
           ),
         ],
@@ -58,16 +52,6 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
       await windowManager.close();
       exit(0);
     }
-  }
-
-  Future<void> _setupWindowHandler() async {
-    final controller = await WindowController.fromCurrentEngine();
-    _mainWindowId = controller.windowId;
-    await controller.setWindowMethodHandler((call) async {
-      if (call.method == 'refresh') {
-        await _refreshUsers();
-      }
-    });
   }
 
   Future<void> _refreshUsers() async {
@@ -80,15 +64,15 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
     }
   }
 
-  Future<void> _openUserWindow({Map<String, dynamic>? user}) async {
-    setState(() => _statusMessage = 'Opening form…');
-    final window = await WindowController.create(WindowConfiguration(
-      arguments: jsonEncode({
-        'user': user,
-        'mainWindowId': _mainWindowId,
-      }),
-    ));
-    await window.show();
+  Future<void> _openUserDialog({Map<String, dynamic>? user}) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => UserFormDialog(
+        initialData: user,
+        onSaved: _refreshUsers,
+      ),
+    );
   }
 
   Future<void> _deleteUser(int id) async {
@@ -98,7 +82,10 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
         title: const Text('Confirm Delete'),
         content: const Text('Are you sure you want to delete this user?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -118,7 +105,7 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
       context: context,
       applicationName: 'User Manager',
       applicationVersion: '1.0.0',
-      applicationLegalese: 'Flutter 3.41 Desktop — Multi-Window + SQLite Demo',
+      applicationLegalese: 'Flutter 3.41 Desktop — SQLite Demo',
     );
   }
 
@@ -129,26 +116,26 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Desktop Menu Bar ──────────────────────────────────────────
+          // ── Menu Bar ─────────────────────────────────────────────────
           MenuBar(
             children: [
               SubmenuButton(
                 menuChildren: [
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.add, size: 16),
-                    onPressed: () => _openUserWindow(),
+                    onPressed: () => _openUserDialog(),
                     child: const MenuAcceleratorLabel('&New User\tCtrl+N'),
                   ),
                   const Divider(),
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.refresh, size: 16),
                     onPressed: _refreshUsers,
-                    child: const MenuAcceleratorLabel('&Refresh\tCtrl+R'),
+                    child: const MenuAcceleratorLabel('&Refresh'),
                   ),
                   const Divider(),
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.exit_to_app, size: 16),
-                    onPressed: () {},
+                    onPressed: () => onWindowClose(),
                     child: const MenuAcceleratorLabel('E&xit'),
                   ),
                 ],
@@ -174,7 +161,7 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
             child: Row(
               children: [
                 FilledButton.icon(
-                  onPressed: () => _openUserWindow(),
+                  onPressed: () => _openUserDialog(),
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('New User'),
                 ),
@@ -203,7 +190,7 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
                             style: theme.textTheme.titleMedium?.copyWith(
                                 color: theme.colorScheme.outline)),
                         FilledButton.icon(
-                          onPressed: () => _openUserWindow(),
+                          onPressed: () => _openUserDialog(),
                           icon: const Icon(Icons.add),
                           label: const Text('Add your first user'),
                         ),
@@ -223,14 +210,16 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
                           columns: const [
                             DataColumn(label: Text('ID'), numeric: true),
                             DataColumn(label: Expanded(child: Text('Name'))),
-                            DataColumn(label: Expanded(child: Text('Date of Birth'))),
-                            DataColumn(label: Expanded(child: Text('Cell Phone'))),
+                            DataColumn(
+                                label: Expanded(child: Text('Date of Birth'))),
+                            DataColumn(
+                                label: Expanded(child: Text('Cell Phone'))),
                             DataColumn(label: Text('Actions')),
                           ],
                           rows: _users.map((user) {
                             return DataRow(
                               onSelectChanged: (_) =>
-                                  _openUserWindow(user: user),
+                                  _openUserDialog(user: user),
                               cells: [
                                 DataCell(Text(user['id'].toString())),
                                 DataCell(Text(user['name'])),
@@ -244,10 +233,11 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
                                       color: theme.colorScheme.primary,
                                       tooltip: 'Edit',
                                       onPressed: () =>
-                                          _openUserWindow(user: user),
+                                          _openUserDialog(user: user),
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.delete, size: 18),
+                                      icon:
+                                          const Icon(Icons.delete, size: 18),
                                       color: theme.colorScheme.error,
                                       tooltip: 'Delete',
                                       onPressed: () =>
@@ -271,12 +261,11 @@ class _MainWindowState extends State<MainWindow> with WindowListener {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                Icon(Icons.circle,
-                    size: 10, color: theme.colorScheme.primary),
+                Icon(Icons.circle, size: 10, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(_statusMessage,
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant)),
               ],
             ),
           ),

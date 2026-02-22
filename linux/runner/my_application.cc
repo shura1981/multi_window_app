@@ -6,7 +6,6 @@
 #endif
 
 #include "flutter/generated_plugin_registrant.h"
-#include "desktop_multi_window/desktop_multi_window_plugin.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -76,10 +75,6 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
-  desktop_multi_window_plugin_set_window_created_callback([](FlPluginRegistry* registry){
-    fl_register_plugins(registry);
-  });
-
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
 
@@ -115,11 +110,6 @@ static void my_application_startup(GApplication* application) {
 
 // Implements GApplication::shutdown.
 static void my_application_shutdown(GApplication* application) {
-  GList* windows = gtk_application_get_windows(GTK_APPLICATION(application));
-  if (windows != nullptr && g_list_length(windows) > 0) {
-    return;  // Ignore premature shutdown when child windows close
-  }
-
   // Perform any actions required at application shutdown.
   G_APPLICATION_CLASS(my_application_parent_class)->shutdown(application);
 }
