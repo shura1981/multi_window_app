@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'email_model.dart';
 import 'email_service.dart';
 
@@ -20,6 +21,7 @@ class EmailDetailView extends StatefulWidget {
 
 class _EmailDetailViewState extends State<EmailDetailView> {
   bool _isDownloading = false;
+  bool _showHtml = true;
 
   void _downloadAttachments() async {
     if (!widget.email.hasAttachments) return;
@@ -73,24 +75,78 @@ class _EmailDetailViewState extends State<EmailDetailView> {
     final theme = Theme.of(context);
     final message = widget.email.originalMessage;
     
-    // Attempt to extract text content
-    String bodyText = message.decodeTextPlainPart() ?? '';
-    if (bodyText.isEmpty) {
-      bodyText = message.decodeTextHtmlPart() ?? 'El correo no contiene texto plano visible.';
-      // We strip basic HTML tags if it's fallback HTML
-      bodyText = bodyText.replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ').trim();
+    // Attempt to extract HTML content first, then fallback to plain text
+    String? htmlBody = message.decodeTextHtmlPart();
+    String? plainBody = message.decodeTextPlainPart();
+    
+    // Fallbacks
+    if (htmlBody == null || htmlBody.trim().isEmpty) {
+      _showHtml = false;
     }
-
-    // Extract image parts
+    
     List<Widget> bodyWidgets = [];
     
-    bodyWidgets.add(
-      SelectableText(
-        bodyText,
-        style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
-      ),
-    );
+    if (_showHtml && htmlBody != null && htmlBody.isNotEmpty) {
+      bodyWidgets.add(
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Container(
+              color: Colors.white, // Force email canvas to white (standard for HTML newsletters)
+              padding: const EdgeInsets.all(16.0),
+              child: HtmlWidget(
+                htmlBody,
+                textStyle: const TextStyle(
+                  fontSize: 14.0,
+                  color: Colors.black, // Force text to black to contrast the white canvas
+                ),
+                // Override inline font-family and strictly enforce black text on all nodes
+                customStylesBuilder: (element) {
+                  return {
+                    'font-family': 'system-ui, sans-serif',
+                    'color': '#000000',
+                  };
+                },
+                customWidgetBuilder: (element) {
+                  if (element.localName == 'img') {
+                  final src = element.attributes['src'] ?? '';
+                  if (src.startsWith('cid:')) {
+                    final cid = src.substring(4);
+                    final part = message.getPartWithContentId(cid);
+                    if (part != null) {
+                      final data = part.decodeContentBinary();
+                      if (data != null) {
+                        return Image.memory(
+                          data, 
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => 
+                            const Icon(Icons.broken_image, color: Colors.grey),
+                        );
+                      }
+                    }
+                    return const Icon(Icons.broken_image, color: Colors.grey);
+                  }
+                }
+                return null;
+              },
+            ),
+          ),
+        ),
+      ));
+    } else if (plainBody != null && plainBody.isNotEmpty) {
+      bodyWidgets.add(
+        SelectableText(
+          plainBody,
+          style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+        ),
+      );
+    } else {
+      bodyWidgets.add(
+        const Text('El correo no contiene contenido visualizable.'),
+      );
+    }
 
+    // Still append inline images encoded in the email that weren't strictly matched inside HTML tags
     if (message.parts != null) {
       for (final part in message.parts!) {
         final contentType = part.mediaType;
@@ -161,14 +217,40 @@ class _EmailDetailViewState extends State<EmailDetailView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('De: ${widget.email.sender}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text('Fecha: ${widget.email.date.toString()}'),
-              if (widget.email.hasAttachments) ...[
-                const SizedBox(height: 4),
-                Text('Adjuntos detectados: ${widget.email.attachmentNames.join(", ")}', 
-                  style: TextStyle(color: theme.colorScheme.primary, fontSize: 13)),
-              ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('De: ${widget.email.sender}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text('Fecha: ${widget.email.date.toString()}'),
+                        if (widget.email.hasAttachments) ...[
+                          const SizedBox(height: 4),
+                          Text('Adjuntos detectados: ${widget.email.attachmentNames.join(", ")}', 
+                            style: TextStyle(color: theme.colorScheme.primary, fontSize: 13)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (htmlBody != null && htmlBody.isNotEmpty)
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(value: true, label: Text('HTML')),
+                        ButtonSegment(value: false, label: Text('Texto')),
+                      ],
+                      selected: {_showHtml},
+                      onSelectionChanged: (Set<bool> newSelection) {
+                        setState(() {
+                          _showHtml = newSelection.first;
+                        });
+                      },
+                      showSelectedIcon: false,
+                    ),
+                ],
+              ),
             ],
           ),
         ),
@@ -187,3 +269,5 @@ class _EmailDetailViewState extends State<EmailDetailView> {
     );
   }
 }
+
+// Removed CidImageExtension as HtmlWidget uses inline customWidgetBuilder

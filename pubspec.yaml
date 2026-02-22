@@ -51,6 +51,8 @@ dependencies:
   shared_preferences: ^2.5.4
   enough_mail: ^2.1.7
   desktop_multi_window: ^0.3.0
+  flutter_html: ^3.0.0
+  flutter_widget_from_html: ^0.17.1
 
 dev_dependencies:
   flutter_test:
