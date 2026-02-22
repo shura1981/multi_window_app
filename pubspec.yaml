@@ -60,6 +60,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -96,6 +97,7 @@ flutter:
   #     fonts:
   #       - asset: fonts/Schyler-Regular.ttf
   #       - asset: fonts/Schyler-Italic.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
   #         style: italic
   #   - family: Trajan Pro
   #     fonts:
@@ -105,3 +107,28 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: false
+  ios: false
+  image_path: "assets/app_icon.png"
+  min_sdk_android: 21
+  linux:
+    generate: true
+    image_path: "assets/app_icon.png"
+  macos:
+    generate: true
+    image_path: "assets/app_icon.png"
+  windows:
+    generate: true
+    image_path: "assets/app_icon.png"
+
+flutter_to_debian:
+  flutter_app:
+    arch: "x64"
+    maintainer: "Steven"
+  control_file:
+    "Version": "1.0.0"
+    "Description": "User Manager with Multi-Window and Print support."
+    "Maintainer": "Steven"
+    "Architecture": "amd64"
