@@ -9,6 +9,10 @@ import 'user_form_dialog.dart';
 import 'system_monitor_dialog.dart';
 import 'print_dialog.dart';
 import 'theme_settings_dialog.dart';
+import 'email_service.dart';
+import 'email_view.dart';
+
+enum ViewState { users, emails }
 
 class MainWindow extends StatefulWidget {
   const MainWindow({super.key});
@@ -21,6 +25,14 @@ class _MainWindowState extends State<MainWindow>
     with WindowListener, TrayListener {
   List<Map<String, dynamic>> _users = [];
   String _statusMessage = 'Ready';
+  ViewState _currentView = ViewState.users;
+  
+  // NOTE: Replace these with actual cPanel IMAP credentials
+  final EmailService _emailService = EmailService(
+    host: 'mail.upnlab.com',
+    username: 'prueba@upnlab.com',
+    password: 'z6sXaPw?+IKz',
+  );
 
   @override
   void initState() {
@@ -223,6 +235,27 @@ class _MainWindowState extends State<MainWindow>
               SubmenuButton(
                 menuChildren: [
                   MenuItemButton(
+                    leadingIcon: const Icon(Icons.people, size: 16),
+                    onPressed: () {
+                      setState(() => _currentView = ViewState.users);
+                    },
+                    shortcut: const SingleActivator(LogicalKeyboardKey.digit1, control: true),
+                    child: const MenuAcceleratorLabel('Ventana &Principal\tCtrl+1'),
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.email, size: 16),
+                    onPressed: () {
+                       setState(() => _currentView = ViewState.emails);
+                    },
+                    shortcut: const SingleActivator(LogicalKeyboardKey.digit2, control: true),
+                    child: const MenuAcceleratorLabel('Ver &Correo\tCtrl+2'),
+                  ),
+                ],
+                child: const MenuAcceleratorLabel('&Modo'),
+              ),
+              SubmenuButton(
+                menuChildren: [
+                  MenuItemButton(
                     leadingIcon: const Icon(Icons.palette, size: 16),
                     onPressed: _showThemeSettings,
                     shortcut: const SingleActivator(LogicalKeyboardKey.keyT, control: true),
@@ -247,7 +280,9 @@ class _MainWindowState extends State<MainWindow>
 
           // ── Data Table — full width ───────────────────────────────────
           Expanded(
-            child: _users.isEmpty
+            child: _currentView == ViewState.emails
+              ? EmailView(emailService: _emailService)
+              : _users.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
