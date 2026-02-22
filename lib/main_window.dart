@@ -13,6 +13,7 @@ class MainWindow extends StatefulWidget {
 class _MainWindowState extends State<MainWindow> {
   List<Map<String, dynamic>> _users = [];
   String? _mainWindowId;
+  String _statusMessage = 'Ready';
 
   @override
   void initState() {
@@ -22,7 +23,6 @@ class _MainWindowState extends State<MainWindow> {
   }
 
   Future<void> _setupWindowHandler() async {
-    // Get the main window's own controller and listen for 'refresh' calls from children.
     final controller = await WindowController.fromCurrentEngine();
     _mainWindowId = controller.windowId;
     await controller.setWindowMethodHandler((call) async {
@@ -37,11 +37,13 @@ class _MainWindowState extends State<MainWindow> {
     if (mounted) {
       setState(() {
         _users = data;
+        _statusMessage = '${data.length} user${data.length == 1 ? '' : 's'} total';
       });
     }
   }
 
   Future<void> _openUserWindow({Map<String, dynamic>? user}) async {
+    setState(() => _statusMessage = 'Opening form…');
     final window = await WindowController.create(WindowConfiguration(
       arguments: jsonEncode({
         'user': user,
@@ -51,84 +53,196 @@ class _MainWindowState extends State<MainWindow> {
     await window.show();
   }
 
-  void _showNativeDialog() {
-    showDialog(
+  Future<void> _deleteUser(int id) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Native OS Dialog Test'),
-        content: const Text(
-            'This is a native desktop dialog using Flutter 3.41 multi-window rendering.'),
+        title: const Text('Confirm Delete'),
+        content: const Text('Are you sure you want to delete this user?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
           ),
         ],
       ),
+    );
+    if (confirmed == true) {
+      await DatabaseHelper.instance.deleteUser(id);
+      _refreshUsers();
+    }
+  }
+
+  void _showAbout() {
+    showAboutDialog(
+      context: context,
+      applicationName: 'User Manager',
+      applicationVersion: '1.0.0',
+      applicationLegalese: 'Flutter 3.41 Desktop — Multi-Window + SQLite Demo',
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('User Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh Table',
-            onPressed: _refreshUsers,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Desktop Menu Bar ──────────────────────────────────────────
+          MenuBar(
+            children: [
+              SubmenuButton(
+                menuChildren: [
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.add, size: 16),
+                    onPressed: () => _openUserWindow(),
+                    child: const MenuAcceleratorLabel('&New User\tCtrl+N'),
+                  ),
+                  const Divider(),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.refresh, size: 16),
+                    onPressed: _refreshUsers,
+                    child: const MenuAcceleratorLabel('&Refresh\tCtrl+R'),
+                  ),
+                  const Divider(),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.exit_to_app, size: 16),
+                    onPressed: () {},
+                    child: const MenuAcceleratorLabel('E&xit'),
+                  ),
+                ],
+                child: const MenuAcceleratorLabel('&File'),
+              ),
+              SubmenuButton(
+                menuChildren: [
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.info_outline, size: 16),
+                    onPressed: _showAbout,
+                    child: const MenuAcceleratorLabel('&About'),
+                  ),
+                ],
+                child: const MenuAcceleratorLabel('&Help'),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Show Native Dialog',
-            onPressed: _showNativeDialog,
+
+          // ── Toolbar ───────────────────────────────────────────────────
+          Container(
+            color: theme.colorScheme.surfaceContainerLow,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: () => _openUserWindow(),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('New User'),
+                ),
+                const SizedBox(width: 8),
+                IconButton.outlined(
+                  icon: const Icon(Icons.refresh, size: 18),
+                  tooltip: 'Refresh',
+                  onPressed: _refreshUsers,
+                ),
+              ],
+            ),
+          ),
+
+          // ── Data Table — full width ───────────────────────────────────
+          Expanded(
+            child: _users.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 12,
+                      children: [
+                        Icon(Icons.people_outline,
+                            size: 64,
+                            color: theme.colorScheme.outlineVariant),
+                        Text('No users yet',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                                color: theme.colorScheme.outline)),
+                        FilledButton.icon(
+                          onPressed: () => _openUserWindow(),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add your first user'),
+                        ),
+                      ],
+                    ),
+                  )
+                : LayoutBuilder(builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      child: SizedBox(
+                        width: constraints.maxWidth,
+                        child: DataTable(
+                          headingRowColor: WidgetStateProperty.all(
+                              theme.colorScheme.surfaceContainerHighest),
+                          showCheckboxColumn: false,
+                          columnSpacing: 24,
+                          horizontalMargin: 24,
+                          columns: const [
+                            DataColumn(label: Text('ID'), numeric: true),
+                            DataColumn(label: Expanded(child: Text('Name'))),
+                            DataColumn(label: Expanded(child: Text('Date of Birth'))),
+                            DataColumn(label: Expanded(child: Text('Cell Phone'))),
+                            DataColumn(label: Text('Actions')),
+                          ],
+                          rows: _users.map((user) {
+                            return DataRow(
+                              onSelectChanged: (_) =>
+                                  _openUserWindow(user: user),
+                              cells: [
+                                DataCell(Text(user['id'].toString())),
+                                DataCell(Text(user['name'])),
+                                DataCell(Text(user['dob'])),
+                                DataCell(Text(user['phone'])),
+                                DataCell(Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, size: 18),
+                                      color: theme.colorScheme.primary,
+                                      tooltip: 'Edit',
+                                      onPressed: () =>
+                                          _openUserWindow(user: user),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, size: 18),
+                                      color: theme.colorScheme.error,
+                                      tooltip: 'Delete',
+                                      onPressed: () =>
+                                          _deleteUser(user['id']),
+                                    ),
+                                  ],
+                                )),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    );
+                  }),
+          ),
+
+          // ── Status Bar ────────────────────────────────────────────────
+          Container(
+            height: 28,
+            color: theme.colorScheme.surfaceContainerLow,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Icon(Icons.circle,
+                    size: 10, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(_statusMessage,
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ],
+            ),
           ),
         ],
-      ),
-      body: _users.isEmpty
-          ? const Center(child: Text('No users found. Add one!'))
-          : SingleChildScrollView(
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('ID')),
-                  DataColumn(label: Text('Name')),
-                  DataColumn(label: Text('DOB')),
-                  DataColumn(label: Text('Phone')),
-                  DataColumn(label: Text('Actions')),
-                ],
-                rows: _users.map((user) {
-                  return DataRow(cells: [
-                    DataCell(Text(user['id'].toString())),
-                    DataCell(Text(user['name'])),
-                    DataCell(Text(user['dob'])),
-                    DataCell(Text(user['phone'])),
-                    DataCell(
-                      Row(
-                        spacing: 8.0,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue),
-                            onPressed: () => _openUserWindow(user: user),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () async {
-                              await DatabaseHelper.instance.deleteUser(user['id']);
-                              _refreshUsers();
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ]);
-                }).toList(),
-              ),
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openUserWindow(),
-        tooltip: 'Add User (New Window)',
-        child: const Icon(Icons.add),
       ),
     );
   }
