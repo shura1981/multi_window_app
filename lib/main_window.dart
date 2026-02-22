@@ -7,6 +7,7 @@ import 'main.dart' show MainWindowRefreshNotifier, openNewUserDialog;
 import 'user_form_dialog.dart';
 import 'system_monitor_dialog.dart';
 import 'print_dialog.dart';
+import 'theme_settings_dialog.dart';
 
 class MainWindow extends StatefulWidget {
   const MainWindow({super.key});
@@ -131,6 +132,13 @@ class _MainWindowState extends State<MainWindow>
     );
   }
 
+  void _showThemeSettings() {
+    showDialog(
+      context: context,
+      builder: (_) => const ThemeSettingsDialog(),
+    );
+  }
+
   void _showAbout() {
     showAboutDialog(
       context: context,
@@ -183,6 +191,16 @@ class _MainWindowState extends State<MainWindow>
                   ),
                 ],
                 child: const MenuAcceleratorLabel('&File'),
+              ),
+              SubmenuButton(
+                menuChildren: [
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.palette, size: 16),
+                    onPressed: _showThemeSettings,
+                    child: const MenuAcceleratorLabel('&Theme Settings'),
+                  ),
+                ],
+                child: const MenuAcceleratorLabel('&View'),
               ),
               SubmenuButton(
                 menuChildren: [
