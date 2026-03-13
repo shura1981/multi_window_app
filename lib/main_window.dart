@@ -72,6 +72,20 @@ class _MainWindowState extends State<MainWindow>
     }
   }
 
+  @override
+  void onTrayIconRightMouseDown() {
+    if (Platform.isWindows) {
+      trayManager.popUpContextMenu();
+    }
+  }
+
+  @override
+  void onTrayIconRightMouseUp() {
+    if (Platform.isLinux) {
+      trayManager.popUpContextMenu();
+    }
+  }
+
   /// Intercepts the OS X button — shows a confirmation dialog first.
   @override
   void onWindowClose() async {

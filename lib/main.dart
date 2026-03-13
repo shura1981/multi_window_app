@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_notifier/local_notifier.dart';
+import 'package:path/path.dart' as p;
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:desktop_webview_window/desktop_webview_window.dart';
@@ -25,6 +26,26 @@ void openNewUserDialog() {
   );
 }
 
+String resolveTrayIconPath() {
+  if (Platform.isWindows) {
+    final exeDir = p.dirname(Platform.resolvedExecutable);
+    final candidates = <String>[
+      // Running from a bundled app/exe.
+      p.join(exeDir, 'resources', 'app_icon.ico'),
+      // Running with `flutter run` from project root.
+      p.join(Directory.current.path, 'windows', 'runner', 'resources', 'app_icon.ico'),
+      // Defensive fallback for some runner layouts.
+      p.normalize(p.join(exeDir, '..', 'resources', 'app_icon.ico')),
+    ];
+    for (final iconPath in candidates) {
+      if (File(iconPath).existsSync()) {
+        return iconPath;
+      }
+    }
+  }
+  return 'assets/tray_icon.png';
+}
+
 Future<void> main(List<String> args) async {
   // ── desktop_webview_window ─────────────────────────────────────────────
   if (runWebViewTitleBarWidget(args)) {
@@ -41,7 +62,7 @@ Future<void> main(List<String> args) async {
   await localNotifier.setup(appName: 'User Manager');
 
   // ── tray_manager ──────────────────────────────────────────────────────
-  await trayManager.setIcon('assets/tray_icon.png');
+  await trayManager.setIcon(resolveTrayIconPath());
   await trayManager.setContextMenu(Menu(
     items: [
       MenuItem(label: 'Show Window', onClick: (_) async {
