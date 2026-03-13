@@ -110,7 +110,7 @@ class _PrintDialogState extends State<PrintDialog> {
               else
                 DropdownButtonFormField<Printer>(
                   decoration: const InputDecoration(border: OutlineInputBorder()),
-                  value: _selectedPrinter,
+                  initialValue: _selectedPrinter,
                   isExpanded: true,
                   items: _printers.map((p) {
                     return DropdownMenuItem<Printer>(

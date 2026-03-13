@@ -26,12 +26,12 @@ void openNewUserDialog() {
 }
 
 Future<void> main(List<String> args) async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
   // ── desktop_webview_window ─────────────────────────────────────────────
   if (runWebViewTitleBarWidget(args)) {
     return;
   }
+
+  WidgetsFlutterBinding.ensureInitialized();
 
   // ── window_manager ────────────────────────────────────────────────────
   await windowManager.ensureInitialized();
