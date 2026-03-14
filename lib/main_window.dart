@@ -4,14 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 import 'database_helper.dart';
-import 'main.dart' show MainWindowRefreshNotifier, openNewUserDialog;
+import 'main.dart' show MainWindowRefreshNotifier;
 import 'user_form_dialog.dart';
 import 'system_monitor_dialog.dart';
 import 'print_dialog.dart';
 import 'theme_settings_dialog.dart';
 import 'email_service.dart';
 import 'email_view.dart';
-import 'browser_dialog.dart';
 
 enum ViewState { users, emails }
 
@@ -158,13 +157,6 @@ class _MainWindowState extends State<MainWindow>
     }
   }
 
-  void _showBrowserDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => const BrowserLauncherDialog(),
-    );
-  }
-
   void _showSystemMonitor() {
     showDialog(
       context: context,
@@ -207,13 +199,13 @@ class _MainWindowState extends State<MainWindow>
           const SingleActivator(LogicalKeyboardKey.keyR, control: true): _refreshUsers,
           const SingleActivator(LogicalKeyboardKey.keyT, control: true): _showThemeSettings,
           const SingleActivator(LogicalKeyboardKey.f1): _showAbout,
+          const SingleActivator(LogicalKeyboardKey.digit1, control: true): () => setState(() => _currentView = ViewState.users),
+          const SingleActivator(LogicalKeyboardKey.digit2, control: true): () => setState(() => _currentView = ViewState.emails),
         },
         child: Focus(
           autofocus: true,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // Webview native extensions occasionally cause the root window to report a microscopic 
-              // constraint (e.g. 1x1) during its platform attach/detach lifecycle on Linux.
               if (constraints.maxHeight < 100 || constraints.maxWidth < 100) {
                 return const SizedBox.shrink();
               }
@@ -279,12 +271,7 @@ class _MainWindowState extends State<MainWindow>
                     shortcut: const SingleActivator(LogicalKeyboardKey.digit2, control: true),
                     child: const MenuAcceleratorLabel('Ver &Correo\tCtrl+2'),
                   ),
-                  MenuItemButton(
-                    leadingIcon: const Icon(Icons.travel_explore, size: 16),
-                    onPressed: () => _showBrowserDialog(),
-                    shortcut: const SingleActivator(LogicalKeyboardKey.digit3, control: true),
-                    child: const Text('Navegador Web'),
-                  ),
+
                 ],
                 child: const MenuAcceleratorLabel('&Modo'),
               ),

@@ -5,7 +5,6 @@ import 'package:local_notifier/local_notifier.dart';
 import 'package:path/path.dart' as p;
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'main_window.dart';
 import 'theme_provider.dart';
 import 'user_form_dialog.dart';
@@ -47,11 +46,6 @@ String resolveTrayIconPath() {
 }
 
 Future<void> main(List<String> args) async {
-  // ── desktop_webview_window ─────────────────────────────────────────────
-  if (runWebViewTitleBarWidget(args)) {
-    return;
-  }
-
   WidgetsFlutterBinding.ensureInitialized();
 
   // ── window_manager ────────────────────────────────────────────────────

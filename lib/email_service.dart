@@ -27,7 +27,7 @@ class EmailService {
       await client.connectToServer(host, port, isSecure: secure);
       await client.login(username, password);
 
-      final mailbox = await client.selectInbox();
+      await client.selectInbox();
       
       // Fetch unseen messages' IDs via SEARCH
       final searchResult = await client.searchMessages(searchCriteria: 'UNSEEN');
