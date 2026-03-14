@@ -147,7 +147,7 @@ def scaffold(
         print("   Next steps:")
         print(f"   1. cd {out_path}")
         print("   2. Add your tray icon to assets/tray_icon.png")
-        print("   3. Edit lib/main_window.dart to build your UI")
+        print("   3. Edit lib/app/window/main_window.dart to build your UI")
         print("   4. flutter run -d linux")
 
 
