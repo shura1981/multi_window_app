@@ -777,9 +777,6 @@ Future<void> openFormWindow({Map<String, dynamic>? initialData}) async {
 
 ```dart
 Future<void> main(List<String> args) async {
-  // Si es desktop_webview_window, retornar inmediatamente
-  if (runWebViewTitleBarWidget(args)) return;
-
   WidgetsFlutterBinding.ensureInitialized();
 
   // Detectar qué tipo de ventana lanzar
@@ -971,28 +968,18 @@ try {
 
 ---
 
-## 9. `desktop_webview_window` — Parche Linux (Bug Crítico)
+## 9. WebView en Linux — No hay soporte (Flutter stable 3.41)
 
-> **Este parche es OBLIGATORIO para cualquier proyecto que use `desktop_webview_window` en Linux.** Sin él, la app crashea con Segmentation Fault al cerrar ventanas del WebView.
+> **Ningún plugin de webview funciona en Flutter Linux desktop stable 3.41.** Para cualquier necesidad de abrir URLs, usar `url_launcher`:
 
-**Archivo a editar:** `~/.pub-cache/hosted/pub.dev/desktop_webview_window-<VERSION>/linux/webview_window.cc`
-
-**Parche 1 — Use-after-free:** invertir el orden en la señal `"destroy"` — notificar a Dart **antes** de destruir la memoria C++. Ver sección 7.22 del SKILL.md para el código completo.
-
-**Parche 2 — Colapso OpenGL:** comentar por completo el bloque de inyección `fl_view_new` (barra de título Flutter dentro del WebView). Ver sección 7.22 del SKILL.md para las líneas exactas.
-
-**Integración en `main()`:**
 ```dart
-Future<void> main(List<String> args) async {
-  if (runWebViewTitleBarWidget(args)) return; // PRIMERA línea, sin mover
-  WidgetsFlutterBinding.ensureInitialized();
-  // ...
-}
+import 'package:url_launcher/url_launcher.dart';
+
+await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 ```
 
-**Tras aplicar el parche:**
-```bash
-flutter clean && flutter run -d linux
-```
-
-> **Contingencia:** Si haces `flutter pub cache clean` o actualizas la versión del plugin, el parche se pierde y debe reaplicarse manualmente.
+| Plugin | Error | Alternativa |
+|---|---|---|
+| `webview_flutter` | Sin impl. Linux | `url_launcher` |
+| `flutter_inappwebview` | Backend GTK no registrado | `url_launcher` |
+| `desktop_webview_window` | Segfault + cierra toda la app | `url_launcher` |

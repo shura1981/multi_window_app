@@ -116,9 +116,11 @@ class ThemeSettingsDialog extends ConsumerWidget {
 
 ---
 
-## 2. Sistema Operativo y Ventanas Múltiples
+## 2. Sistema Operativo y Ventanas
 
-Gestionar ventanas en sistemas de escritorio bajo frameworks móviles es complejo. Aquí se agrupan los recursos para controlar el sistema de visibilidad, bandeja y arquitectura multi-ventana.
+> **⚠️ Decisión arquitectural:** Este proyecto usa **ventana única** con `ViewState` enum (`users`, `emails`) para alternar entre secciones. El plugin `desktop_multi_window` fue evaluado y **retirado** — añade complejidad de comunicación inter-motor sin beneficio real para este caso de uso. La API nativa de multi-ventana del SDK es `@internal` y experimental (solo canal `main`).
+
+> **⚠️ WebView en Linux:** Ningún plugin de webview funciona en Flutter Linux desktop stable 3.41. `webview_flutter` no tiene implementación Linux; `flutter_inappwebview` falla con assertion de plataforma; `desktop_webview_window` causa segfault. Ver [docs/linux_webview_patch.md](./linux_webview_patch.md). **Alternativa:** `url_launcher` para abrir el navegador del sistema.
 
 ### `window_manager` y `tray_manager` (Soporte Multiplataforma para Íconos)
 Estas dos librerías trabajan de la mano. `window_manager` previene los cierres por defecto y gestiona el foco nativo. `tray_manager` crea el pequeño icono inferior que se usa para despertar la aplicación desde el **Systray**.
@@ -256,28 +258,6 @@ class _MainWindowState extends State<MainWindow> with WindowListener, TrayListen
       exit(0);
     }
   }
-}
-```
-
-### `desktop_multi_window`
-Al manejar sistemas con ventanas que necesitan vivir en contextos separados (ej. Un panel de formulario de usuario paralelo a su DataGrid principal), Flutter emplea instanciaciones de Multi-ventana de manera paralela.
-
-Una ventana hija puede comunicarse con la ventana principal y viceversa o, también "ocultarse" temporalmente para rehusar cerrar el thread nativo de esa ventana.
-
-```dart
-import 'package:desktop_multi_window/desktop_multi_window.dart';
-
-// Ocultar la ventana en lugar de destruirla para mejor rendimiento al reabrirse (ej: user_form_window.dart)
-Future<void> _hideWindow() async {
-  final self = await WindowController.fromCurrentEngine();
-  await self.hide();
-}
-
-// Envío de señales de comunicación Inter-Ventana: Disparar refresco
-final mainId = widget.mainWindowId;
-if (mainId != null) {
-  final mainController = WindowController.fromWindowId(mainId);
-  await mainController.invokeMethod('refresh');
 }
 ```
 

@@ -2,12 +2,17 @@
 
 Esta sección contiene la referencia técnica exhaustiva para el desarrollo de aplicaciones de escritorio de alto rendimiento en Flutter, cubriendo la arquitectura Multi-View nativa, APIs de integración con el sistema operativo y personalización avanzada de ventanas.
 
+> **⚠️ EVALÚA ANTES DE USAR `desktop_multi_window`:**
+> Para la mayoría de apps (alternar entre secciones, formularios, diálogos), un `enum ViewState` + `IndexedStack` en una **sola ventana** es suficiente y no requiere ningún plugin. **El plugin `desktop_multi_window` fue eliminado de este proyecto** por esa razón.
+>
+> Usa `desktop_multi_window: ^0.3.0` únicamente si genuinamente necesitas **ventanas OS simultáneas e independientes** (editor multi-documento, panel flotante separado, ventana de detalles secundaria). Si solo cambias vistas dentro de la misma ventana — no lo uses.
+
 > **⚠️ ESTADO EN FLUTTER 3.41 STABLE (CRÍTICO — LEER ANTES DE GENERAR CÓDIGO):**
 > La API de windowing nativa (`RegularWindowController`, `DialogWindowController`, etc.) existe en el código fuente de Flutter 3.41 en `lib/src/widgets/_window.dart`, pero **todas las clases están marcadas `@internal`** y protegidas por un feature flag experimental. Para usarlas se requiere:
 > 1. Cambiar al canal `main` (`flutter channel main`)
 > 2. Activar el flag: `debugEnabledFeatureFlags.add('windowing')`
 >
-> **En Flutter stable 3.41, la multi-ventana production-ready sigue requiriendo el plugin `desktop_multi_window: ^0.3.0`.** No generes código con `PlatformDispatcher.instance.requestView()` ni `PlatformDispatcher.instance.closeView()` para stable — esas funciones no existen en la API pública.
+> **Si decides usar multi-window en stable 3.41, el plugin `desktop_multi_window: ^0.3.0` es la opción viable.** No generes código con `PlatformDispatcher.instance.requestView()` ni `PlatformDispatcher.instance.closeView()` para stable — esas funciones no existen en la API pública.
 
 ### 7.1 Estado de la Windowing API por Canal
 
@@ -1004,9 +1009,11 @@ void onTrayIconMouseDown() async {
 
 ---
 
-## 7.16 Plugin `desktop_multi_window` — ✅ REQUERIDO en Stable 3.41
+## 7.16 Plugin `desktop_multi_window` — Referencia para Ventanas OS Independientes
 
-> **Estado real (stable 3.41):** `desktop_multi_window: ^0.3.0` es la solución **recomendada y funcional** para multi-ventana en Flutter desktop stable. La alternativa nativa del SDK existe pero está marcada `@internal` y solo se puede usar en el canal `main` con feature flag experimental.
+> **⚠️ Primero evalúa si lo necesitas.** Para alternar vistas/secciones dentro de la app, usa `enum ViewState` + `IndexedStack`. `desktop_multi_window` crea un motor Flutter separado por ventana — solo tiene sentido cuando necesitas **ventanas OS genuinamente independientes y simultáneas**.
+>
+> **Estado real (stable 3.41):** Si decides usar multi-window, `desktop_multi_window: ^0.3.0` es la opción funcional para stable. La alternativa nativa del SDK existe pero está marcada `@internal` y solo se puede usar en el canal `main` con feature flag experimental.
 >
 > **Futuro (cuando salga de experimental):** `RegularWindowController` y sus hermanos del SDK nativo reemplazarán al plugin. Se podrá migrar cuando la Windowing API llegue a stable sin breaking changes.
 
@@ -1462,114 +1469,30 @@ pdf.addPage(pw.Page(
 
 ---
 
-## 7.22 Plugin `desktop_webview_window` — Bug Crítico en Linux (Parche Obligatorio)
+## 7.22 WebView en Linux — Plugins Incompatibles (Flutter stable 3.41)
 
-> **⚠️ ADVERTENCIA CRÍTICA:** El plugin `desktop_webview_window: ^0.2.3` tiene un bug de **use-after-free + doble colapso OpenGL** en Linux (Ubuntu/Wayland/X11) que produce un **Segmentation Fault** al cerrar ventanas del WebView. **La app entera crashea.** Este bug NO está corregido en pub.dev. Requiere un parche manual al código C++ del cache.
+> **⚠️ CONCLUSIÓN DEFINITIVA (verificado en proyecto real, marzo 2026):** **No existe ningún plugin de webview funcional para Flutter Linux desktop en stable 3.41.** Todos los plugins evaluados fallan en runtime. La alternativa es `url_launcher` para delegar al navegador del sistema.
 
-> **Si ejecutas `flutter pub cache clean` o actualizas el plugin, el parche se pierde y debes reaplicarlo.**
+| Plugin | Versión | Error en runtime | Veredicto |
+|---|---|---|---|
+| `webview_flutter` | `^4.13.1` | `WebViewPlatform.instance != null` — sin impl. Linux | ❌ No usar |
+| `flutter_inappwebview` | `^6.1.5` | `InAppWebViewPlatform.instance != null` — backend GTK no se registra | ❌ No usar |
+| `desktop_webview_window` | `^0.2.3` | Segfault al cerrar + cierra toda la app | ❌ No usar |
 
-### Síntoma
-
-```
-[signal 11] Segmentation fault at: 0x...
-Context Loss / Use-After-Free — linea ~66 de webview_window.cc
-flutter: OpenGL context loss after secondary window close
-```
-
-### Locación del archivo vulnerable
-
-```bash
-~/.pub-cache/hosted/pub.dev/desktop_webview_window-<VERSION>/linux/webview_window.cc
-```
-
-### Parche 1 — Use-After-Free en la señal `"destroy"` (línea ~66)
-
-El bug original notifica a Dart **después** de liberar la memoria de la ventana. Debe invertirse el orden:
-
-**❌ ORIGINAL (buggy):**
-```cpp
-g_signal_connect(G_OBJECT(window_), "destroy",
-                 G_CALLBACK(+[](GtkWidget *, gpointer arg) {
-                   auto *window = static_cast<WebviewWindow *>(arg);
-                   if (window->on_close_callback_) {
-                     window->on_close_callback_(); // ← LIBERA MEMORIA AQUÍ
-                   }
-                   // CRASH: lee window_id_ de memoria ya liberada
-                   auto *args = fl_value_new_map();
-                   fl_value_set(args, fl_value_new_string("id"),
-                       fl_value_new_int(window->window_id_));
-                   fl_method_channel_invoke_method(...);
-                 }), this);
-```
-
-**✅ CORRECTO (parche):**
-```cpp
-g_signal_connect(G_OBJECT(window_), "destroy",
-                 G_CALLBACK(+[](GtkWidget *, gpointer arg) {
-                   auto *window = static_cast<WebviewWindow *>(arg);
-                   // 1. Notificar a Dart PRIMERO (memoria aún válida)
-                   auto *args = fl_value_new_map();
-                   fl_value_set(args, fl_value_new_string("id"),
-                       fl_value_new_int(window->window_id_));
-                   fl_method_channel_invoke_method(
-                       FL_METHOD_CHANNEL(window->method_channel_),
-                       "onWindowClose", args, nullptr, nullptr, nullptr);
-                   // 2. Liberar memoria C++ DESPUÉS
-                   if (window->on_close_callback_) {
-                     window->on_close_callback_();
-                   }
-                 }), this);
-```
-
-### Parche 2 — Colapso OpenGL por inyección de `FlView` secundaria (línea ~85)
-
-El plugin intenta incrustar una segunda vista Flutter (`fl_view_new`) como barra de título del WebView. Esto colapsa el motor OpenGL/GTK en Linux con multiprocesamiento. **Comentar por completo** las ~12 líneas del bloque `// initial flutter_view`:
-
-```cpp
-// COMENTAR (previene crash OpenGL/GTK en Linux):
-// g_autoptr(FlDartProject) project = fl_dart_project_new();
-// const char *args[] = {"web_view_title_bar", g_strdup_printf("%ld", window_id), nullptr};
-// fl_dart_project_set_dart_entrypoint_arguments(project, const_cast<char **>(args));
-// auto *title_bar = fl_view_new(project);
-//
-// g_autoptr(FlPluginRegistrar) desktop_webview_window_registrar =
-//     fl_plugin_registry_get_registrar_for_plugin(
-//         FL_PLUGIN_REGISTRY(title_bar), "DesktopWebviewWindowPlugin");
-// client_message_channel_plugin_register_with_registrar(desktop_webview_window_registrar);
-//
-// gtk_widget_set_size_request(GTK_WIDGET(title_bar), -1, title_bar_height);
-// gtk_widget_set_vexpand(GTK_WIDGET(title_bar), FALSE);
-// gtk_box_pack_start(box_, GTK_WIDGET(title_bar), FALSE, FALSE, 0);
-```
-
-También comentar el `handler_id` residual cerca del final del constructor (~línea 118):
-
-```cpp
-// guint handler_id = g_signal_handler_find(window_, G_SIGNAL_MATCH_DATA, 0, 0, NULL, NULL, title_bar);
-// if (handler_id > 0) {
-//   g_signal_handler_disconnect(window_, handler_id);
-// }
-```
-
-### Integración en `main()` (obligatorio)
-
-El plugin requiere interceptar los args de arranque **antes** de `WidgetsFlutterBinding.ensureInitialized()`:
+### Alternativa: `url_launcher`
 
 ```dart
-Future<void> main(List<String> args) async {
-  // DEBE ser la primera línea — no mover
-  if (runWebViewTitleBarWidget(args)) return;
+import 'package:url_launcher/url_launcher.dart';
 
-  WidgetsFlutterBinding.ensureInitialized();
-  // ... resto de la inicialización
+Future<void> abrirEnNavegador(String url) async {
+  final uri = Uri.parse(url);
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 }
 ```
 
-### Recompilar tras el parche
-
-```bash
-flutter clean && flutter run -d linux
-```
+`url_launcher` funciona en todas las plataformas (Linux, macOS, Windows, iOS, Android) y abre la URL en el navegador predeterminado del sistema operativo.
 
 ---
 
