@@ -50,6 +50,7 @@ Before applying recommendations from this skill:
 
 * [desktop widgets catalog](templates/desktop_widgets.md)
 * [desktop project patterns](templates/desktop_project_patterns.md)
+* [desktop plugin bugs & patches](templates/desktop_plugin_bugs.md)
 * [mobile widgets catalog](templates/mobile_widgets.md)
 * [web widgets catalog](templates/web_widgets.md)
 
@@ -182,6 +183,7 @@ The `templates/` directory contains exhaustive, version-by-version documentation
 *   **[mobile_widgets.md](templates/mobile_widgets.md)** — iOS (Cupertino) and Android (Material) widgets: `CupertinoSheet`, `CupertinoButton.tinted`, `CupertinoSlidingSegmentedControl` momentary mode, `CupertinoExpansionTile`, `CarouselView.builder`, `RepeatingAnimationBuilder`, `SensitiveContent`, Impeller changes, SPM migration, UIScene lifecycle, wide-gamut P3 colors, and all breaking changes.
 *   **[desktop_widgets.md](templates/desktop_widgets.md)** — Windows, macOS, and Linux widgets: Multi-window support (regular, dialog, popup, tooltip windows), UI/platform thread merge for smooth resizing, `RawMenuAnchor`, `NavigationRail` scrollable, `NavigationDrawer` headers/footers, `Expansible`/`ExpansibleController`, and SPM on macOS.
 *   **[desktop_project_patterns.md](templates/desktop_project_patterns.md)** — Patrones de boilerplate extraídos de un proyecto real de escritorio Flutter: gestión de temas con `flutter_riverpod` + `shared_preferences`, `window_manager` + `tray_manager` (resolución de ícono Windows, workaround Wayland, eventos de clic por plataforma), `local_notifier`, `sqflite_common_ffi` + `path_provider`, generación de PDF con `pdf` + `printing`, cliente IMAP con `enough_mail`, y `MenuBar` nativo con `CallbackShortcuts`.
+*   **[desktop_plugin_bugs.md](templates/desktop_plugin_bugs.md)** — Bugs conocidos de plugins Flutter Desktop en Linux con parches C++ obligatorios: `desktop_webview_window` use-after-free Segfault + colapso OpenGL por `FlView` embebido, tabla de versiones afectadas, instrucciones de localización del archivo en `.pub-cache`, código de parche listo para copiar, y protocolo de contingencia si el parche se pierde tras `pub cache clean`.
 *   **[web_widgets.md](templates/web_widgets.md)** — Web (CanvasKit/WASM) rendering and widgets: HTML renderer removal, WASM dry-run validation, `WebParagraph` enhancements, native `<img>` offloading, stateful web hot reload, `dart:js_interop` migration, `OverlayPortal` improvements, and platform-specific asset bundling.
 
 **You MUST consult these catalogs** when building for a specific platform to ensure you are using the exact latest API and not legacy patterns.
