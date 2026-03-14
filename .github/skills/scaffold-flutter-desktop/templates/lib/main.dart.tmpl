@@ -1,0 +1,125 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_notifier/local_notifier.dart';
+import 'package:path/path.dart' as p;
+import 'package:tray_manager/tray_manager.dart';
+import 'package:window_manager/window_manager.dart';
+import 'package:desktop_webview_window/desktop_webview_window.dart';
+import 'main_window.dart';
+import 'theme_provider.dart';
+
+/// Global navigator key — lets tray callbacks open dialogs without BuildContext.
+final mainNavigatorKey = GlobalKey<NavigatorState>();
+
+/// Resolves the tray icon path.
+/// On Windows, Flutter asset paths don't work for tray icons — use the absolute
+/// disk path to the .ico file placed in windows/runner/resources/.
+String resolveTrayIconPath() {
+  if (Platform.isWindows) {
+    final exeDir = p.dirname(Platform.resolvedExecutable);
+    final candidates = <String>[
+      p.join(exeDir, 'resources', 'app_icon.ico'),
+      p.join(Directory.current.path, 'windows', 'runner', 'resources', 'app_icon.ico'),
+      p.normalize(p.join(exeDir, '..', 'resources', 'app_icon.ico')),
+    ];
+    for (final iconPath in candidates) {
+      if (File(iconPath).existsSync()) return iconPath;
+    }
+  }
+  return 'assets/tray_icon.png';
+}
+
+Future<void> main(List<String> args) async {
+  // ── desktop_webview_window: MUST be first call in main() ─────────────────
+  if (runWebViewTitleBarWidget(args)) return;
+
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // ── window_manager ────────────────────────────────────────────────────────
+  await windowManager.ensureInitialized();
+  await windowManager.setPreventClose(true);
+
+  // ── local_notifier ────────────────────────────────────────────────────────
+  await localNotifier.setup(appName: '{{APP_NAME}}');
+
+  // ── tray_manager ──────────────────────────────────────────────────────────
+  await trayManager.setIcon(resolveTrayIconPath());
+  await trayManager.setContextMenu(Menu(
+    items: [
+      MenuItem(
+        label: 'Show Window',
+        onClick: (_) async {
+          if (!await windowManager.isFocused()) {
+            if (await windowManager.isMinimized()) await windowManager.restore();
+            if (Platform.isLinux) {
+              // Unmap + remap bypasses Wayland focus-stealing prevention.
+              await windowManager.hide();
+            }
+            await windowManager.show();
+            await windowManager.setAlwaysOnTop(true);
+            await windowManager.focus();
+            await Future.delayed(const Duration(milliseconds: 300));
+            await windowManager.setAlwaysOnTop(false);
+          }
+        },
+      ),
+      MenuItem.separator(),
+      // TODO: Add custom tray menu items here.
+      MenuItem.separator(),
+      MenuItem(
+        label: 'Exit',
+        onClick: (_) async {
+          await trayManager.destroy();
+          await windowManager.close();
+          exit(0);
+        },
+      ),
+    ],
+  ));
+
+  if (Platform.isWindows || Platform.isMacOS) {
+    await trayManager.setToolTip('{{APP_NAME}}');
+  }
+
+  runApp(const ProviderScope(child: MainApp()));
+}
+
+class MainApp extends ConsumerWidget {
+  const MainApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(themeProvider);
+
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      navigatorKey: mainNavigatorKey,
+      title: '{{APP_NAME}}',
+      themeMode: settings.mode,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: settings.color,
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: settings.color,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      home: const MainWindow(),
+    );
+  }
+}
+
+/// Simple ChangeNotifier bus — triggers data refresh from outside the widget tree
+/// (e.g. from tray menu callbacks, sub-windows, or global functions).
+class MainWindowRefreshNotifier extends ChangeNotifier {
+  MainWindowRefreshNotifier._();
+  static final instance = MainWindowRefreshNotifier._();
+  void requestRefresh() => notifyListeners();
+}
