@@ -1652,4 +1652,404 @@ pdf.addPage(pw.Page(
 
 ---
 
-**Final Directive:** If the code you generate misses opportunities to use `CarouselView.builder`, `popUntilWithResult`, `CupertinoSheet` drag handles, `RepeatingAnimationBuilder`, uses `SizedBox` for spacing, or prefixes an Enum unnecessarily, you have failed the 3.41 standard. For desktop apps on **Flutter stable 3.41**: generating code that calls `PlatformDispatcher.instance.requestView()` or `PlatformDispatcher.instance.closeView()` (these methods do not exist in the public stable API), using `SystemNavigator.pop()` to close a sub-window (it kills the entire process), omitting the native plugin registration callback for multi-window engines, assuming that multi-window uses a single Isolate in stable (it does not — each window is a separate engine requiring `WindowMethodChannel` for sync), assuming a single `devicePixelRatio` for multi-monitor setups, omitting `sqfliteFfiInit()` in desktop database apps, placing shortcuts only in `MenuItemButton.shortcut` without `CallbackShortcuts`, or skipping `resolveTrayIconPath()` for Windows tray icons also constitutes a failure of the 3.41 standard. For multi-window in stable, use `desktop_multi_window: ^0.3.0`. The native Windowing API (`RegularWindowController`, etc.) is experimental and only available on the `main` channel. Write perfect modern Dart natively tailored to the platform.
+## 7.22 Plugin `desktop_webview_window` — Bug Crítico en Linux (Parche Obligatorio)
+
+> **⚠️ ADVERTENCIA CRÍTICA:** El plugin `desktop_webview_window: ^0.2.3` tiene un bug de **use-after-free + doble colapso OpenGL** en Linux (Ubuntu/Wayland/X11) que produce un **Segmentation Fault** al cerrar ventanas del WebView. **La app entera crashea.** Este bug NO está corregido en pub.dev. Requiere un parche manual al código C++ del cache.
+
+> **Si ejecutas `flutter pub cache clean` o actualizas el plugin, el parche se pierde y debes reaplicarlo.**
+
+### Síntoma
+
+```
+[signal 11] Segmentation fault at: 0x...
+Context Loss / Use-After-Free — linea ~66 de webview_window.cc
+flutter: OpenGL context loss after secondary window close
+```
+
+### Locación del archivo vulnerable
+
+```bash
+~/.pub-cache/hosted/pub.dev/desktop_webview_window-<VERSION>/linux/webview_window.cc
+```
+
+### Parche 1 — Use-After-Free en la señal `"destroy"` (línea ~66)
+
+El bug original notifica a Dart **después** de liberar la memoria de la ventana. Debe invertirse el orden:
+
+**❌ ORIGINAL (buggy):**
+```cpp
+g_signal_connect(G_OBJECT(window_), "destroy",
+                 G_CALLBACK(+[](GtkWidget *, gpointer arg) {
+                   auto *window = static_cast<WebviewWindow *>(arg);
+                   if (window->on_close_callback_) {
+                     window->on_close_callback_(); // ← LIBERA MEMORIA AQUÍ
+                   }
+                   // CRASH: lee window_id_ de memoria ya liberada
+                   auto *args = fl_value_new_map();
+                   fl_value_set(args, fl_value_new_string("id"),
+                       fl_value_new_int(window->window_id_));
+                   fl_method_channel_invoke_method(...);
+                 }), this);
+```
+
+**✅ CORRECTO (parche):**
+```cpp
+g_signal_connect(G_OBJECT(window_), "destroy",
+                 G_CALLBACK(+[](GtkWidget *, gpointer arg) {
+                   auto *window = static_cast<WebviewWindow *>(arg);
+                   // 1. Notificar a Dart PRIMERO (memoria aún válida)
+                   auto *args = fl_value_new_map();
+                   fl_value_set(args, fl_value_new_string("id"),
+                       fl_value_new_int(window->window_id_));
+                   fl_method_channel_invoke_method(
+                       FL_METHOD_CHANNEL(window->method_channel_),
+                       "onWindowClose", args, nullptr, nullptr, nullptr);
+                   // 2. Liberar memoria C++ DESPUÉS
+                   if (window->on_close_callback_) {
+                     window->on_close_callback_();
+                   }
+                 }), this);
+```
+
+### Parche 2 — Colapso OpenGL por inyección de `FlView` secundaria (línea ~85)
+
+El plugin intenta incrustar una segunda vista Flutter (`fl_view_new`) como barra de título del WebView. Esto colapsa el motor OpenGL/GTK en Linux con multiprocesamiento. **Comentar por completo** las ~12 líneas del bloque `// initial flutter_view`:
+
+```cpp
+// COMENTAR (previene crash OpenGL/GTK en Linux):
+// g_autoptr(FlDartProject) project = fl_dart_project_new();
+// const char *args[] = {"web_view_title_bar", g_strdup_printf("%ld", window_id), nullptr};
+// fl_dart_project_set_dart_entrypoint_arguments(project, const_cast<char **>(args));
+// auto *title_bar = fl_view_new(project);
+//
+// g_autoptr(FlPluginRegistrar) desktop_webview_window_registrar =
+//     fl_plugin_registry_get_registrar_for_plugin(
+//         FL_PLUGIN_REGISTRY(title_bar), "DesktopWebviewWindowPlugin");
+// client_message_channel_plugin_register_with_registrar(desktop_webview_window_registrar);
+//
+// gtk_widget_set_size_request(GTK_WIDGET(title_bar), -1, title_bar_height);
+// gtk_widget_set_vexpand(GTK_WIDGET(title_bar), FALSE);
+// gtk_box_pack_start(box_, GTK_WIDGET(title_bar), FALSE, FALSE, 0);
+```
+
+También comentar el `handler_id` residual cerca del final del constructor (~línea 118):
+
+```cpp
+// guint handler_id = g_signal_handler_find(window_, G_SIGNAL_MATCH_DATA, 0, 0, NULL, NULL, title_bar);
+// if (handler_id > 0) {
+//   g_signal_handler_disconnect(window_, handler_id);
+// }
+```
+
+### Integración en `main()` (obligatorio)
+
+El plugin requiere interceptar los args de arranque **antes** de `WidgetsFlutterBinding.ensureInitialized()`:
+
+```dart
+Future<void> main(List<String> args) async {
+  // DEBE ser la primera línea — no mover
+  if (runWebViewTitleBarWidget(args)) return;
+
+  WidgetsFlutterBinding.ensureInitialized();
+  // ... resto de la inicialización
+}
+```
+
+### Recompilar tras el parche
+
+```bash
+flutter clean && flutter run -d linux
+```
+
+---
+
+## 7.23 Patrones Avanzados de Impresión: Lista de Impresoras + `directPrintPdf`
+
+La sección 7.21 cubre `Printing.layoutPdf()` (diálogo nativo del SO). Para UX donde el usuario selecciona la impresora **dentro de la app Flutter** y envía sin diálogo del SO, usa `Printing.listPrinters()` + `Printing.directPrintPdf()`.
+
+### Diálogo de selección de impresora (patrón de producción)
+
+```dart
+import 'package:printing/printing.dart';
+import 'print_service.dart'; // tu generatePdf()
+
+class PrintDialog extends StatefulWidget {
+  final List<Map<String, dynamic>> data;
+  const PrintDialog({super.key, required this.data});
+  @override
+  State<PrintDialog> createState() => _PrintDialogState();
+}
+
+class _PrintDialogState extends State<PrintDialog> {
+  List<Printer> _printers = [];
+  Printer? _selectedPrinter;
+  bool _isLoading = true;
+  bool _isPrinting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrinters();
+  }
+
+  Future<void> _loadPrinters() async {
+    try {
+      final list = await Printing.listPrinters();
+      Printer? defaultPrinter;
+      if (list.isNotEmpty) {
+        try {
+          defaultPrinter = list.firstWhere((p) => p.isDefault == true);
+        } catch (_) {
+          defaultPrinter = list.first;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _printers = list;
+          _selectedPrinter = defaultPrinter;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _print() async {
+    if (_selectedPrinter == null) return;
+    setState(() => _isPrinting = true);
+    try {
+      final pdfBytes = await PrintService.generateUsersPdf(widget.data);
+      final result = await Printing.directPrintPdf(
+        printer: _selectedPrinter!,
+        onLayout: (format) => pdfBytes,
+        name: 'Reporte.pdf',
+      );
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result
+              ? 'Enviado a ${_selectedPrinter!.name}'
+              : 'Trabajo de impresión cancelado'),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isPrinting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 16,
+            children: [
+              const Text('Seleccionar Impresora',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (_printers.isEmpty)
+                const Text('No se encontraron impresoras.',
+                    style: TextStyle(color: Colors.red))
+              else
+                DropdownButtonFormField<Printer>(
+                  value: _selectedPrinter,
+                  decoration: const InputDecoration(
+                    labelText: 'Impresora',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _printers
+                      .map((p) => DropdownMenuItem(
+                            value: p,
+                            child: Text(p.name +
+                                (p.isDefault == true ? ' (default)' : '')),
+                          ))
+                      .toList(),
+                  onChanged: (p) => setState(() => _selectedPrinter = p),
+                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                spacing: 8,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'),
+                  ),
+                  FilledButton.icon(
+                    onPressed:
+                        (_isPrinting || _selectedPrinter == null) ? null : _print,
+                    icon: _isPrinting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.print),
+                    label: const Text('Imprimir'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+### Diferencia entre métodos de impresión
+
+| Método | UX | Cuándo usar |
+|---|---|---|
+| `Printing.layoutPdf(onLayout: ...)` | Abre diálogo nativo del SO | Experiencia rápida, el SO gestiona la selección |
+| `Printing.directPrintPdf(printer: p, onLayout: ...)` | Sin diálogo del SO — envío directo | Cuando tienes selección de impresora propia en Flutter |
+| `Printing.sharePdf(bytes: ...)` | Abre visor/compartir externo | Guardar o enviar por correo |
+| `Printing.listPrinters()` | — | Obtener lista `List<Printer>` para dropdown |
+
+---
+
+## 7.24 Patrón: `GlobalKey<NavigatorState>` — Diálogos desde Callbacks del Tray
+
+Los callbacks `onClick` del tray se ejecutan **fuera del árbol de widgets**. No existe `BuildContext`. Para mostrar un `AlertDialog` o `showDialog` desde un ítem de menú del tray, se usa un `GlobalKey<NavigatorState>` registrado en `MaterialApp`.
+
+```dart
+// lib/main.dart — clave global accesible desde cualquier parte del proceso
+final mainNavigatorKey = GlobalKey<NavigatorState>();
+
+// Función que usa la clave para abrir un diálogo sin context
+void openNewUserDialog() {
+  final ctx = mainNavigatorKey.currentContext;
+  if (ctx == null) return; // ventana puede estar oculta
+  showDialog(
+    context: ctx,
+    barrierDismissible: false,
+    builder: (_) => UserFormDialog(
+      onSaved: () => MainWindowRefreshNotifier.instance.requestRefresh(),
+    ),
+  );
+}
+
+// Registrar la clave en MaterialApp
+MaterialApp(
+  navigatorKey: mainNavigatorKey, // ← obligatorio
+  home: const MainWindow(),
+);
+
+// Uso en un ítem del menú de tray
+MenuItem(
+  label: 'New User',
+  onClick: (_) async {
+    // 1. Traer la ventana al frente primero
+    await windowManager.show();
+    await windowManager.focus();
+    await Future.delayed(const Duration(milliseconds: 200));
+    // 2. Abrir el diálogo con la clave global
+    openNewUserDialog();
+  },
+),
+```
+
+> **Regla:** Siempre esperar a que la ventana esté en primer plano **antes** de abrir el diálogo. Si se abre el diálogo mientras la ventana está oculta, el diálogo queda en un estado inaccesible. Añadir `Future.delayed(Duration(milliseconds: 200))` entre `focus()` y `showDialog()`.
+
+---
+
+## 7.25 Patrón: `ChangeNotifier` Singleton como Bus de Notificaciones Intra-Motor
+
+Para comunicar eventos dentro del mismo motor Flutter (ventana principal ↔ widgets hijos / tray callbacks) sin Riverpod ni channels, se usa un singleton `ChangeNotifier`:
+
+```dart
+// lib/main.dart — bus de notificación global para la ventana principal
+class MainWindowRefreshNotifier extends ChangeNotifier {
+  static final MainWindowRefreshNotifier instance = MainWindowRefreshNotifier._();
+  MainWindowRefreshNotifier._();
+
+  void requestRefresh() => notifyListeners();
+}
+```
+
+```dart
+// En el widget que necesita reaccionar (ej. MainWindow):
+@override
+void initState() {
+  super.initState();
+  MainWindowRefreshNotifier.instance.addListener(_refreshData);
+}
+
+@override
+void dispose() {
+  MainWindowRefreshNotifier.instance.removeListener(_refreshData);
+  super.dispose();
+}
+
+Future<void> _refreshData() async { /* recargar desde DB */ }
+```
+
+```dart
+// Disparar desde cualquier lugar (tray, sub-ventana via WindowMethodChannel, etc.):
+MainWindowRefreshNotifier.instance.requestRefresh();
+```
+
+> **Cuándo usar vs `WindowMethodChannel`:**
+> - **Mismo motor / misma ventana principal** → `ChangeNotifier` singleton (más simple, sin serialización)
+> - **Entre ventanas separadas (`desktop_multi_window`)** → `WindowMethodChannel` (requerido porque son Isolates distintos)
+
+---
+
+## 7.26 Aclaración: `onClick` closures en `MenuItem` tray — Comportamiento Real (Linux)
+
+La documentación clásica indica que **no se deben usar closures `onClick`** en `MenuItem` para Linux/AppIndicator por problemas de bindings C++. **Con `tray_manager: ^0.5.2` este comportamiento cambia:**
+
+| Versión | onClick closures en Linux | Recomendación |
+|---|---|---|
+| `tray_manager < 0.4.x` | ❌ Falla silenciosamente (bindings perdidos) | Usar solo `onTrayMenuItemClick` |
+| `tray_manager ^0.5.2` | ✅ Funcional en Linux con closures | Ambos métodos válidos |
+
+**Patrón con closures (^0.5.2 — más ergonómico):**
+```dart
+await trayManager.setContextMenu(Menu(items: [
+  MenuItem(label: 'Show', onClick: (_) async {
+    await windowManager.show();
+    await windowManager.focus();
+  }),
+  MenuItem(label: 'Exit', onClick: (_) async {
+    await trayManager.destroy();
+    exit(0);
+  }),
+]));
+```
+
+**Patrón con `onTrayMenuItemClick` (compatible con todas las versiones):**
+```dart
+// En el ContextMenu, usar keys en lugar de closures
+await trayManager.setContextMenu(Menu(items: [
+  MenuItem(key: 'show', label: 'Show'),
+  MenuItem(key: 'exit', label: 'Exit'),
+]));
+
+// En el State con TrayListener:
+@override
+void onTrayMenuItemClick(MenuItem item) {
+  switch (item.key) {
+    case 'show': windowManager.show();
+    case 'exit': exit(0);
+  }
+}
+```
+
+> **Recomendación final:** Si necesitas compatibilidad máxima con versiones anteriores de `tray_manager`, usa el patrón `key` + `onTrayMenuItemClick`. Si usas `^0.5.2` y solo apuntas a plataformas modernas, ambos funcionan.
+
+---
+
+**Final Directive:** If the code you generate misses opportunities to use `CarouselView.builder`, `popUntilWithResult`, `CupertinoSheet` drag handles, `RepeatingAnimationBuilder`, uses `SizedBox` for spacing, or prefixes an Enum unnecessarily, you have failed the 3.41 standard. For desktop apps on **Flutter stable 3.41**: generating code that calls `PlatformDispatcher.instance.requestView()` or `PlatformDispatcher.instance.closeView()` (these methods do not exist in the public stable API), using `SystemNavigator.pop()` to close a sub-window (it kills the entire process), omitting the native plugin registration callback for multi-window engines, assuming that multi-window uses a single Isolate in stable (it does not — each window is a separate engine requiring `WindowMethodChannel` for sync), assuming a single `devicePixelRatio` for multi-monitor setups, omitting `sqfliteFfiInit()` in desktop database apps, placing shortcuts only in `MenuItemButton.shortcut` without `CallbackShortcuts`, skipping `resolveTrayIconPath()` for Windows tray icons, or omitting `runWebViewTitleBarWidget(args)` as the first call in `main()` when using `desktop_webview_window` also constitutes a failure of the 3.41 standard. For multi-window in stable, use `desktop_multi_window: ^0.3.0`. The native Windowing API (`RegularWindowController`, etc.) is experimental and only available on the `main` channel. For Linux with `desktop_webview_window`, always apply the C++ patch (use-after-free + OpenGL FlView injection) — without it the app crashes on WebView window close. Write perfect modern Dart natively tailored to the platform.
