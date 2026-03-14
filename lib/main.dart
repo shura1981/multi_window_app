@@ -43,7 +43,7 @@ String resolveTrayIconPath() {
       }
     }
   }
-  return 'assets/tray_icon.png';
+  return 'assets/tray_icon_48x48.png';
 }
 
 Future<void> main(List<String> args) async {

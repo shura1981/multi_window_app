@@ -48,6 +48,36 @@ class _BrowserLauncherDialogState extends State<BrowserLauncherDialog> {
       _webview = null;
     });
 
+    // Fix: target="_blank" links and window.open() calls trigger WebKit's
+    // "create" signal, which the native plugin handles incorrectly (returns
+    // the same WebKitWebView as a popup). This causes the GTK destroy signal
+    // to fire, closing the webview unexpectedly and crashing the app.
+    // We intercept at JS level to redirect new-window requests into same-window
+    // navigation before WebKit ever fires the "create" signal.
+    _webview?.addScriptToExecuteOnDocumentCreated('''
+      (function() {
+        // Override window.open so JS-triggered popups load in the same view.
+        window.open = function(url, name, features) {
+          if (url && url !== '' && url !== 'about:blank') {
+            window.location.href = url;
+          }
+          return null;
+        };
+
+        // Intercept clicks on <a target="_blank"> links before the browser
+        // can request a new window from the host.
+        document.addEventListener('click', function(e) {
+          var el = e.target;
+          while (el && el.tagName !== 'A') { el = el.parentElement; }
+          if (el && el.getAttribute && el.getAttribute('target') === '_blank' && el.href) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.href = el.href;
+          }
+        }, true);
+      })();
+    ''');
+
     _webview?.launch(urlStr);
     
     // Close the dialog after launching

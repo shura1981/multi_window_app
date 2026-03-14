@@ -16,7 +16,7 @@
         {
             "label": "2. Generar Instalador (.deb)",
             "type": "shell",
-            "command": "./build_deb.sh",
+            "command": "./linux/installer/build_deb.sh",
             "group": "build",
             // Depende de que primero exista el build compilado
             "dependsOn": [

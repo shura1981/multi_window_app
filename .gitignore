@@ -51,4 +51,4 @@ app.*.map.json
 pubspec.lock
 
 # FVM Version Cache
-.fvm/
+.fvm//linux/installer/releases/
