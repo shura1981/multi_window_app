@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'theme_provider.dart';
+import 'package:multi_window_app/features/theme/theme_provider.dart';
 
 class ThemeSettingsDialog extends ConsumerWidget {
   const ThemeSettingsDialog({super.key});

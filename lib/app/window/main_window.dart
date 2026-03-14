@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
-import 'database_helper.dart';
-import 'main.dart' show MainWindowRefreshNotifier;
-import 'user_form_dialog.dart';
-import 'system_monitor_dialog.dart';
-import 'print_dialog.dart';
-import 'theme_settings_dialog.dart';
-import 'email_service.dart';
-import 'email_view.dart';
+import 'package:multi_window_app/app/main_window_refresh_notifier.dart';
+import 'package:multi_window_app/core/data/database_helper.dart';
+import 'package:multi_window_app/features/emails/data/email_service.dart';
+import 'package:multi_window_app/features/emails/presentation/email_view.dart';
+import 'package:multi_window_app/features/printing/print_dialog.dart';
+import 'package:multi_window_app/features/system/system_monitor_dialog.dart';
+import 'package:multi_window_app/features/theme/theme_settings_dialog.dart';
+import 'package:multi_window_app/features/users/user_form_dialog.dart';
 
 enum ViewState { users, emails }
 

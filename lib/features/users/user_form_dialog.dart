@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:local_notifier/local_notifier.dart';
-import 'database_helper.dart';
+import 'package:multi_window_app/core/data/database_helper.dart';
 
 /// A dialog widget for adding or editing a user.
 /// Shown inline via showDialog — no separate OS window needed.

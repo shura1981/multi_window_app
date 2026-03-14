@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:enough_mail/enough_mail.dart';
 import 'package:path_provider/path_provider.dart';
-import 'email_model.dart';
 import 'package:path/path.dart' as p;
+import 'package:multi_window_app/features/emails/data/email_model.dart';
 
 class EmailService {
   final String host;

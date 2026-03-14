@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'email_model.dart';
-import 'email_service.dart';
-import 'email_detail_view.dart';
+import 'package:multi_window_app/features/emails/data/email_model.dart';
+import 'package:multi_window_app/features/emails/data/email_service.dart';
+import 'package:multi_window_app/features/emails/presentation/email_detail_view.dart';
 
 class EmailView extends StatefulWidget {
   final EmailService emailService;

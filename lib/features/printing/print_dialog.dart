@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import 'print_service.dart';
+import 'package:multi_window_app/features/printing/print_service.dart';
 
 class PrintDialog extends StatefulWidget {
   final List<Map<String, dynamic>> usersToPrint;
